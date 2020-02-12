@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.0 (2020-02-12)
+
+- FIXED deprecation warning from Python 3.9 (#40 [nugend](https://github.com/nugend))
+- FIXED keep order of received dict and it's nested objects (#38 [wsantos](https://github.com/wsantos))
+- Drops Python 2 support and Python 3.4
+
 ## 3.4.0 (2019-07-24)
 
 - FIXED sort order with regard to a nested list of dictionaries (#33 [wsantos](https://github.com/wsantos))

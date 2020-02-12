@@ -2,20 +2,18 @@
 key/value pair mapping of nested dictionaries.
 
 """
-import collections
+try:
+    from collections.abc import MutableMapping
+except ImportError:  # pragma: nocover
+    from collections import MutableMapping
+import sys
 
-__version__ = '3.4.0'
+__version__ = '4.0.0'
 
 NO_DEFAULT = object()
 
-# Python 2/3 string compat
-try:
-    basestring
-except NameError:
-    basestring = str
 
-
-class FlatDict(collections.MutableMapping):
+class FlatDict(MutableMapping):
     """:class:`~flatdict.FlatDict` is a dictionary object that allows for
     single level, delimited key/value pair mapping of nested dictionaries.
     The default delimiter value is ``:`` but can be changed in the constructor
@@ -70,10 +68,10 @@ class FlatDict(collections.MutableMapping):
 
         """
         if isinstance(other, dict):
-            return sorted(self.as_dict()) == sorted(other)
+            return self.as_dict() == other
         elif not isinstance(other, self.__class__):
             raise TypeError
-        return sorted(self.as_dict()) == sorted(other.as_dict())
+        return self.as_dict() == other.as_dict()
 
     def __ne__(self, other):
         """Check for inequality against the other value
@@ -95,7 +93,8 @@ class FlatDict(collections.MutableMapping):
 
         """
         values = self._values
-        for part in key.split(self._delimiter):
+        key = [key] if isinstance(key, int) else key.split(self._delimiter)
+        for part in key:
             values = values[part]
         return values
 
@@ -284,20 +283,14 @@ class FlatDict(collections.MutableMapping):
 
         for key, value in self._values.items():
             if isinstance(value, (FlatDict, dict)):
-                nested = [self._delimiter.join([key, k]) for k in value.keys()]
+                nested = [
+                    self._delimiter.join([str(key), str(k)])
+                    for k in value.keys()]
                 keys += nested if nested else [key]
             else:
                 keys.append(key)
 
-        return [
-            self._delimiter.join(map(str, item))
-            for item in sorted(
-                [
-                    int(s_key) if s_key.isdigit() else s_key
-                    for s_key in key.split(self._delimiter)
-                ] for key in keys
-            )
-        ]
+        return keys
 
     def pop(self, key, default=NO_DEFAULT):
         """If key is in the flat dictionary, remove it and return its value,
@@ -377,7 +370,7 @@ class FlatDict(collections.MutableMapping):
         :rtype: bool
 
         """
-        return isinstance(key, basestring) and self._delimiter in key
+        return isinstance(key, str) and self._delimiter in key
 
 
 class FlatterDict(FlatDict):
@@ -476,8 +469,8 @@ class FlatterDict(FlatDict):
         keys = subset.keys()
         if any(self._has_delimiter(k) for k in keys):
             out = []
-            split_keys = [k.split(self._delimiter)[0] for k in keys]
-            for k in sorted(set(split_keys), key=lambda x: int(x)):
+            split_keys = {k.split(self._delimiter)[0] for k in keys}
+            for k in sorted(split_keys, key=lambda x: int(x)):
                 if subset[k].original_type == tuple:
                     out.append(tuple(self._child_as_list(pk, k)))
                 elif subset[k].original_type == list:
@@ -487,4 +480,10 @@ class FlatterDict(FlatDict):
                 elif subset[k].original_type == dict:
                     out.append(subset[k].as_dict())
             return out
-        return [subset[k] for k in sorted(keys, key=lambda x: int(x))]
+
+        # Python prior 3.6 does not guarantee insertion order, remove it after
+        # EOL python 3.5 - 2020-09-13
+        if sys.version_info[0:2] < (3, 6):  # pragma: nocover
+            return [subset[k] for k in sorted(keys, key=lambda x: int(x))]
+        else:
+            return [subset[k] for k in keys]
